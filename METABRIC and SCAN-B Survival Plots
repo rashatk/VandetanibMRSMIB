@@ -1,0 +1,419 @@
+####METABRIC DATASET####
+###-------SIGNATURE SCORES
+#load metabric log intensity expression data 
+metab=read.table("data_mrna_agilent_microarray.txt", header=T, sep="\t")
+#matrix preparation and mean duplicates
+df=subset(metab, duplicated(metab$Hugo_Symbol))
+means=do.call(rbind,lapply(lapply(split(df,df$Hugo_Symbol),`[`,2:ncol(df)),colMeans))
+meanrows=rownames(means)
+library(dplyr)
+singles2=filter(metab, !(Hugo_Symbol %in% meanrows))
+rownames(singles2)=singles2$Hugo_Symbol
+singles2=singles2[-c(1)]
+means=data.frame(means)
+names(means)
+merged_df=rbind(singles2,means)
+merged_df=merged_df[-c(1)]
+#load clinical data and subset ER status
+clin_pt=read.table("data_clinical_patient.txt", header=T, sep="\t")
+ER_mb=clin_pt[c(1,7)]
+rownames(ER_mb)=ER_mb$PATIENT_ID
+ER_mb=ER_mb[-c(1)]
+names(merged_df)=gsub("[.]", "-", names(merged_df))
+ER_mb=clin_pt[c(1,7)]
+rownames(ER_mb)=ER_mb$PATIENT_ID
+ER_mb=ER_mb[-c(1)]
+ERpos=subset(ER_mb, ER_mb$ER_IHC=="Positve")
+pts=rownames(ERpos)
+ERdata=subset(merged_df, names(merged_df)%in% pts)
+
+###Median centroid score calculation
+#subset by signature among ER+ patients
+#----ALL_up
+mtx=na.omit(ERdata[ALL_up,]) ##specify signature
+subsetted=data.frame(t(mtx))
+subsetted$score=apply(mtx,2,median)
+centroid=subsetted[c("score")]
+
+quantile(centroid$score)
+centroid$median=ifelse(centroid$score>148.90274,"High","Low")
+quantile(centroid$score, probs=c(0.3333,0.6666))
+centroid$tertile=ifelse(centroid$score>165.1477,"High", ifelse(centroid$score<132.4893, "Low", "Mid"))
+rownames(centroid) <- gsub("[.]", "-", rownames(centroid))
+centpts=rownames(centroid)
+
+##---divide clinical data for survival curves
+names(clin_pt)
+surv=clin_pt[c(1,14,15,23,24)]
+rownames(surv)=surv$PATIENT_ID
+surv=surv[-c(1)]
+survptz=subset(surv, rownames(surv) %in% centpts)
+pts2=rownames(survptz)
+centroid=centroid %>% arrange(factor(rownames(centroid), levels = pts2))
+
+##merge columns and omit those without a status
+merged=cbind(centroid,survptz)
+
+unique(merged$OS_STATUS)
+unique(merged$RFS_STATUS)
+
+#----selecting overall survival data
+library(survminer)
+library(survival)
+
+survcolumns <- merged
+survivv <- as.matrix(survcolumns)
+unique(survcolumns$OS_STATUS)
+survv <-sub("0:LIVING", "0", survivv)
+survv2 <-sub("1:DECEASED", "1", survv)
+survivaldf <- as.data.frame(survv2)
+OS_MONTHS <- survivaldf$OS_MONTHS
+OS_STATUS <- survivaldf$OS_STATUS
+monthz <- as.numeric(OS_MONTHS)
+status <- as.numeric(OS_STATUS)
+
+#plot by median cutoff
+survivaldf$median2=factor(survivaldf$median, levels=c('Low','High'))
+fit <- survfit(Surv(monthz, status) ~ median2, data = survivaldf)
+res.cox <- coxph(Surv(monthz, status) ~ median2, data = survivaldf)
+summary(res.cox, conf.int=FALSE)
+nrow(survivaldf)
+ggsurvplot(fit, data = survivaldf, pval=TRUE, pval.method=TRUE, linetype = 1, size=1.5, title="Overlap UP - Overall Survival (n=1904)", subtitle="HR=1.20", break.x.by = 25, xlab = "Time (months)", conf.int = FALSE,  xlim=c(0, 200), legend.labs =c("Low", "High"), palette =c("#E7B800","#ca4781"), risk.table = FALSE, tables.theme = theme_cleantable(), tables.y.text = FALSE, font.subtitle = c(10, "black"),font.x=10, font.y=10, font.main=c(12,"bold"),font.tickslab=c(10),censor.size=0, font.legend=c(10,"bold"), pval.size=4, pval.method.coord=c(7, 0.24), pval.method.size=4, legend = c(0.14, 0.45))
+
+
+
+#----ALL_down
+mtx=na.omit(ERdata[ALL_down,]) ##specify signature
+subsetted=data.frame(t(mtx))
+subsetted$score=apply(mtx,2,median)
+centroid=subsetted[c("score")]
+
+quantile(centroid$score)
+centroid$median=ifelse(centroid$score>6.895341,"High","Low")
+quantile(centroid$score, probs=c(0.3333,0.6666))
+centroid$tertile=ifelse(centroid$score>7.133391,"High", ifelse(centroid$score<6.669978, "Low", "Mid"))
+rownames(centroid) <- gsub("[.]", "-", rownames(centroid))
+centpts=rownames(centroid)
+
+##---divide clinical data for survival curves
+names(clin_pt)
+surv=clin_pt[c(1,14,15,23,24)]
+rownames(surv)=surv$PATIENT_ID
+surv=surv[-c(1)]
+survptz=subset(surv, rownames(surv) %in% centpts)
+pts2=rownames(survptz)
+centroid=centroid %>% arrange(factor(rownames(centroid), levels = pts2))
+
+##merge columns and omit those without a status
+merged=cbind(centroid,survptz)
+
+unique(merged$OS_STATUS)
+unique(merged$RFS_STATUS)
+
+#----selecting overall survival data
+library(survminer)
+library(survival)
+
+survcolumns <- merged
+survivv <- as.matrix(survcolumns)
+unique(survcolumns$OS_STATUS)
+survv <-sub("0:LIVING", "0", survivv)
+survv2 <-sub("1:DECEASED", "1", survv)
+survivaldf <- as.data.frame(survv2)
+OS_MONTHS <- survivaldf$OS_MONTHS
+OS_STATUS <- survivaldf$OS_STATUS
+monthz <- as.numeric(OS_MONTHS)
+status <- as.numeric(OS_STATUS)
+
+#plot by median cutoff
+survivaldf$median2=factor(survivaldf$median, levels=c('High','Low'))
+fit <- survfit(Surv(monthz, status) ~ median2, data = survivaldf)
+res.cox <- coxph(Surv(monthz, status) ~ median2, data = survivaldf)
+summary(res.cox, conf.int=FALSE)
+nrow(survivaldf)
+ggsurvplot(fit, data = survivaldf, pval=TRUE, pval.method=TRUE, linetype = 1, size=1.5, title="Overlap DOWN - Overall Survival (n=1904)", subtitle="HR=0.74", break.x.by = 25, xlab = "Time (months)", ylab="Overall survival probability", conf.int = FALSE,  xlim=c(0, 200), legend.labs =c("High", "Low"), palette =c("#ca4781","#E7B800"), risk.table = FALSE, tables.theme = theme_cleantable(), tables.y.text = FALSE, font.subtitle = c(10, "black"),font.x=10, font.y=13, font.main=c(12,"bold"),font.tickslab=c(10),censor.size=0, font.legend=c(10,"bold"), pval.size=4, pval.method.coord=c(7, 0.24), pval.method.size=4, legend = c(0.14, 0.45))
+
+
+#----selecting RFS data
+survcolumns <- merged
+survivv <- as.matrix(survcolumns)
+unique(survcolumns$RFS_STATUS)
+survv <-sub("0:Not Recurred", "0", survivv)
+survv2 <-sub("1:Recurred", "1", survv)
+survivaldf <- as.data.frame(survv2)
+RFS_MONTHS <- survivaldf$RFS_MONTHS
+RFS_STATUS <- survivaldf$RFS_STATUS
+monthz <- as.numeric(RFS_MONTHS)
+status <- as.numeric(RFS_STATUS)
+
+#plot by median cutoff
+survivaldf$median2=factor(survivaldf$median, levels=c('High','Low'))
+fit <- survfit(Surv(monthz, status) ~ median2, data = survivaldf)
+res.cox <- coxph(Surv(monthz, status) ~ median2, data = survivaldf)
+summary(res.cox, conf.int=FALSE)
+nrow(survivaldf)
+ggsurvplot(fit, data = survivaldf, pval=TRUE, pval.method=TRUE, linetype = 1, size=1.5, title="Overlap DOWN - Recurrence Free Survival (n=1904)", subtitle="HR=0.60", break.x.by = 25, ylab="Recurrence free survival probability",xlab = "Time (months)", conf.int = FALSE,  xlim=c(0, 200), legend.labs =c("High", "Low"), palette =c("#ca4781", "#E7B800"), risk.table = FALSE, tables.theme = theme_cleantable(), tables.y.text = FALSE, font.subtitle = c(10, "black"),font.x=10, font.y=13, font.main=c(12,"bold"),font.tickslab=c(10),censor.size=0, font.legend=c(10,"bold"), pval.size=4, pval.method.coord=c(7, 0.24), pval.method.size=4, legend = c(0.14, 0.45))
+
+
+
+####SCAN B DATASET####
+#load data
+scan=read.table("SCANB.9206.genematrix_noNeg-006.txt",sep="\t",header=TRUE)
+scanlist=scan[c(1)]
+genes=scanlist$X
+rownames(scan)=genes
+scan=scan[-c(1)]
+#noramalization and filtering
+df=scan[rowSums(scan) > 0,]
+library(edgeR)
+keep <- filterByExpr(df)
+df <- df[keep,]
+library(NOISeq)
+data=uqua(df, long = 1000, lc = 0, k = 0)
+data=as.data.frame(data)
+#load clinical info
+clinical=read.csv("Supplementary Data Table 1 - 2023-01-13.csv",header=TRUE,row.names=1)
+#match patients
+dataset_pts=names(data)
+dataset_pts
+clinical_pts=rownames(clinical)
+clinical_pts
+identical(dataset_pts,clinical_pts)
+#select ER
+names(clinical)
+ERpos=clinical[c("SSP.ER")]
+ERpos=subset(ERpos, ERpos$SSP.ER == "Positive")
+ERpts=rownames(ERpos)
+
+ncol(data)
+n(ERpts)
+xx=intersect(ERpts, names(data))
+xy=setdiff(names(data), ERpts)
+
+ERdata=data[,xx]
+ERdata=data[,ERpts]
+ERclinical=clinical[ERpts,]
+identical(names(ERdata),rownames(ERclinical))
+#survival dataframe
+names(ERclinical)
+survivalz=ERclinical[c(52:59)]
+#gene annotations
+annot=read.table("Gene.ID.ann.txt",sep="\t",header=TRUE)
+annotlist=annot$Gene.ID
+genes=rownames(ERdata)
+ERannot=subset(annot, annot$Gene.ID %in% genes)
+identical(annotlist, genes)
+ERannot=ERannot[order(ERannot$Gene.ID,decreasing=FALSE),]
+identical(ERannot$Gene.ID,genes)
+newlist=ERannot$Gene.Name
+row.names(ERdata)=newlist
+dups=subset(ERannot,duplicated(ERannot$HGNC))
+dupgenes=dups$Gene.ID
+nondupannot=subset(ERannot, !ERannot$Gene.ID %in% dupgenes)
+dupgenenames=dups$Gene.Name
+ERdata=subset(ERdata, !rownames(ERdata) %in% dupgenenames)
+identical(rownames(ERdata),nondupannot$Gene.Name)
+
+
+###Median centroid score calculation
+#subset by signature among ER+ patients
+
+#----ALL_up
+mtx=na.omit(ERdata[ALL_up,]) ##specify signature
+subsetted=data.frame(t(mtx))
+subsetted$score=apply(mtx,2,median)
+centroid=subsetted[c("score")]
+
+quantile(centroid$score)
+centroid$median=ifelse(centroid$score>128.59256,"High","Low")
+centpts=rownames(centroid)
+
+##---divide clinical data for survival curves
+names(survivalz)
+identical(rownames(centroid),rownames(ERclinical))
+merged=cbind(centroid,survivalz)
+
+#----selecting overall survival data
+library(survminer)
+library(survival)
+survcolumns <- merged
+survivv <- as.matrix(survcolumns)
+unique(survcolumns$OS_event)
+survivaldf <- as.data.frame(survivv)
+OS_DAYS <- survivaldf$OS_days
+OS_STATUS <- survivaldf$OS_event
+dayz <- as.numeric(OS_DAYS)
+status <- as.numeric(OS_STATUS)
+#plot by median cutoff
+survivaldf$median2=factor(survivaldf$median, levels=c('Low','High'))
+fit <- survfit(Surv(dayz, status) ~ median2, data = survivaldf)
+res.cox <- coxph(Surv(dayz, status) ~ median2, data = survivaldf)
+summary(res.cox, conf.int=FALSE)
+nrow(na.omit(survivaldf))
+max(na.omit(survivaldf)$OS_days)
+min(na.omit(survivaldf)$OS_days)
+ggsurvplot(fit, data = survivaldf, pval=TRUE, pval.method=TRUE, linetype = 1, size=1.5, title="Overlapping upregulated genes \nin SCAN-B patients", subtitle="HR=1.00", break.x.by = 1000, ylab="Overall survival probability",xlab = "Time (days)", conf.int = FALSE, legend.labs =c("Low", "High"), palette =c("#E7B800","#ca4781"), risk.table = FALSE, tables.theme = theme_cleantable(), tables.y.text = FALSE, font.subtitle = c(10, "black"),font.x=10, font.y=10, font.main=c(12,"bold"),font.tickslab=c(10),censor.size=0, font.legend=c(10,"bold"), pval.size=4, pval.method.coord=c(50, 0.24), pval.method.size=4, legend = c(0.14, 0.45))
+
+
+#----selecting recurrence free interval data
+library(survminer)
+library(survival)
+survcolumns <- merged
+survivv <- as.matrix(survcolumns)
+unique(survcolumns$RFi_event)
+survivaldf <- as.data.frame(survivv)
+RFi_DAYS <- survivaldf$RFi_days
+RFi_STATUS <- survivaldf$RFi_event
+dayz <- as.numeric(RFi_DAYS)
+status <- as.numeric(RFi_STATUS)
+#plot by median cutoff
+survivaldf$median2=factor(survivaldf$median, levels=c('Low','High'))
+fit <- survfit(Surv(dayz, status) ~ median2, data = survivaldf)
+res.cox <- coxph(Surv(dayz, status) ~ median2, data = survivaldf)
+summary(res.cox, conf.int=FALSE)
+nrow(na.omit(survivaldf))
+max(na.omit(survivaldf)$RFi_days)
+min(na.omit(survivaldf)$RFi_days)
+ggsurvplot(fit, data = survivaldf, pval=TRUE, pval.method=TRUE, linetype = 1, size=1.5, title="Overlapping upregulated genes \nin SCAN-B patients", subtitle="HR=0.93", break.x.by = 1000, ylab="Recurrence free survival probability",xlab = "Time (days)", conf.int = FALSE, legend.labs =c("Low", "High"), palette =c("#E7B800","#ca4781"), risk.table = FALSE, tables.theme = theme_cleantable(), tables.y.text = FALSE, font.subtitle = c(10, "black"),font.x=10, font.y=10, font.main=c(12,"bold"),font.tickslab=c(10),censor.size=0, font.legend=c(10,"bold"), pval.size=4, pval.method.coord=c(50, 0.24), pval.method.size=4, legend = c(0.14, 0.45))
+
+#----selecting distant recurrence free interval data
+library(survminer)
+library(survival)
+survcolumns <- merged
+survivv <- as.matrix(survcolumns)
+unique(survcolumns$DRFi_event)
+survivaldf <- as.data.frame(survivv)
+DRFi_DAYS <- survivaldf$DRFi_days
+DRFi_STATUS <- survivaldf$DRFi_event
+dayz <- as.numeric(DRFi_DAYS)
+status <- as.numeric(DRFi_STATUS)
+#plot by median cutoff
+survivaldf$median2=factor(survivaldf$median, levels=c('Low','High'))
+fit <- survfit(Surv(dayz, status) ~ median2, data = survivaldf)
+res.cox <- coxph(Surv(dayz, status) ~ median2, data = survivaldf)
+summary(res.cox, conf.int=FALSE)
+nrow(na.omit(survivaldf))
+max(na.omit(survivaldf)$DRFi_days)
+min(na.omit(survivaldf)$DRFi_days)
+ggsurvplot(fit, data = survivaldf, pval=TRUE, pval.method=TRUE, linetype = 1, size=1.5, title="Overlapping upregulated genes \nin SCAN-B patients", subtitle="HR=0.87", break.x.by = 1000, ylab="Distant recurrence free survival probability",xlab = "Time (days)", conf.int = FALSE, legend.labs =c("Low", "High"), palette =c("#E7B800","#ca4781"), risk.table = FALSE, tables.theme = theme_cleantable(), tables.y.text = FALSE, font.subtitle = c(10, "black"),font.x=10, font.y=10, font.main=c(12,"bold"),font.tickslab=c(10),censor.size=0, font.legend=c(10,"bold"), pval.size=4, pval.method.coord=c(50, 0.24), pval.method.size=4, legend = c(0.14, 0.45))
+
+#----selecting breast cancer free interval data
+library(survminer)
+library(survival)
+survcolumns <- merged
+survivv <- as.matrix(survcolumns)
+unique(survcolumns$BCFi_event)
+survivaldf <- as.data.frame(survivv)
+BCFi_DAYS <- survivaldf$BCFi_days
+BCFi_STATUS <- survivaldf$BCFi_event
+dayz <- as.numeric(BCFi_DAYS)
+status <- as.numeric(BCFi_STATUS)
+#plot by median cutoff
+survivaldf$median2=factor(survivaldf$median, levels=c('Low','High'))
+fit <- survfit(Surv(dayz, status) ~ median2, data = survivaldf)
+res.cox <- coxph(Surv(dayz, status) ~ median2, data = survivaldf)
+summary(res.cox, conf.int=FALSE)
+nrow(na.omit(survivaldf))
+max(na.omit(survivaldf)$BCFi_days)
+min(na.omit(survivaldf)$BCFi_days)
+ggsurvplot(fit, data = survivaldf, pval=TRUE, pval.method=TRUE, linetype = 1, size=1.5, title="Overlapping upregulated genes \nin SCAN-B patients (n=5384)", subtitle="HR=0.70", break.x.by = 1000, ylab="Breast cancer free interval probability",xlab = "Time (days)", conf.int = FALSE, legend.labs =c("Low", "High"), palette =c("#E7B800","#ca4781"), risk.table = FALSE, tables.theme = theme_cleantable(), tables.y.text = FALSE, font.subtitle = c(10, "black"),font.x=10, font.y=10, font.main=c(12,"bold"),font.tickslab=c(10),censor.size=0, font.legend=c(10,"bold"), pval.size=4, pval.method.coord=c(50, 0.24), pval.method.size=4, legend = c(0.14, 0.45))
+
+#----ALL_down
+mtx=na.omit(ERdata[ALL_down,]) ##specify signature
+subsetted=data.frame(t(mtx))
+subsetted$score=apply(mtx,2,median)
+centroid=subsetted[c("score")]
+
+quantile(centroid$score)
+centroid$median=ifelse(centroid$score>73.00099,"High","Low")
+centpts=rownames(centroid)
+
+##---divide clinical data for survival curves
+names(survivalz)
+identical(rownames(centroid),rownames(ERclinical))
+merged=cbind(centroid,survivalz)
+
+
+#----selecting overall survival data
+library(survminer)
+library(survival)
+survcolumns <- merged
+survivv <- as.matrix(survcolumns)
+unique(survcolumns$OS_event)
+survivaldf <- as.data.frame(survivv)
+OS_DAYS <- survivaldf$OS_days
+OS_STATUS <- survivaldf$OS_event
+dayz <- as.numeric(OS_DAYS)
+status <- as.numeric(OS_STATUS)
+#plot by median cutoff
+survivaldf$median2=factor(survivaldf$median, levels=c('High','Low'))
+fit <- survfit(Surv(dayz, status) ~ median2, data = survivaldf)
+res.cox <- coxph(Surv(dayz, status) ~ median2, data = survivaldf)
+summary(res.cox, conf.int=FALSE)
+nrow(na.omit(survivaldf))
+max(na.omit(survivaldf)$OS_days)
+min(na.omit(survivaldf)$OS_days)
+ggsurvplot(fit, data = survivaldf, pval=TRUE, pval.method=TRUE, linetype = 1, size=1.5, title="Overlapping downregulated genes \nin SCAN-B patients", subtitle="HR=0.82", break.x.by = 1000, xlab = "Time (days)", ylab="Overall survival probability",conf.int = FALSE, legend.labs =c("High", "Low"), palette =c("#ca4781", "#E7B800"), risk.table = FALSE, tables.theme = theme_cleantable(), tables.y.text = FALSE, font.subtitle = c(10, "black"),font.x=10, font.y=13, font.main=c(12,"bold"),font.tickslab=c(10),censor.size=0, font.legend=c(10,"bold"), pval.size=4, pval.method.coord=c(50, 0.24), pval.method.size=4, legend = c(0.14, 0.45))
+
+#----selecting recurrence free interval data
+library(survminer)
+library(survival)
+survcolumns <- merged
+survivv <- as.matrix(survcolumns)
+unique(survcolumns$RFi_event)
+survivaldf <- as.data.frame(survivv)
+RFi_DAYS <- survivaldf$RFi_days
+RFi_STATUS <- survivaldf$RFi_event
+dayz <- as.numeric(RFi_DAYS)
+status <- as.numeric(RFi_STATUS)
+#plot by median cutoff
+survivaldf$median2=factor(survivaldf$median, levels=c('High','Low'))
+fit <- survfit(Surv(dayz, status) ~ median2, data = survivaldf)
+res.cox <- coxph(Surv(dayz, status) ~ median2, data = survivaldf)
+summary(res.cox, conf.int=FALSE)
+nrow(na.omit(survivaldf))
+max(na.omit(survivaldf)$RFi_days)
+min(na.omit(survivaldf)$RFi_days)
+ggsurvplot(fit, data = survivaldf, pval=TRUE, pval.method=TRUE, linetype = 1, size=1.5, title="Overlapping downregulated genes \nin SCAN-B patients", subtitle="HR=0.87", break.x.by = 1000, ylab="Recurrence free survival probability",xlab = "Time (days)", conf.int = FALSE, legend.labs =c("High", "Low"), palette =c("#ca4781", "#E7B800"), risk.table = FALSE, tables.theme = theme_cleantable(), tables.y.text = FALSE, font.subtitle = c(10, "black"),font.x=10, font.y=10, font.main=c(12,"bold"),font.tickslab=c(10),censor.size=0, font.legend=c(10,"bold"), pval.size=4, pval.method.coord=c(50, 0.24), pval.method.size=4, legend = c(0.14, 0.45))
+
+#----selecting distant recurrence free interval data
+library(survminer)
+library(survival)
+survcolumns <- merged
+survivv <- as.matrix(survcolumns)
+unique(survcolumns$DRFi_event)
+survivaldf <- as.data.frame(survivv)
+DRFi_DAYS <- survivaldf$DRFi_days
+DRFi_STATUS <- survivaldf$DRFi_event
+dayz <- as.numeric(DRFi_DAYS)
+status <- as.numeric(DRFi_STATUS)
+#plot by median cutoff
+survivaldf$median2=factor(survivaldf$median, levels=c('High','Low'))
+fit <- survfit(Surv(dayz, status) ~ median2, data = survivaldf)
+res.cox <- coxph(Surv(dayz, status) ~ median2, data = survivaldf)
+summary(res.cox, conf.int=FALSE)
+nrow(na.omit(survivaldf))
+max(na.omit(survivaldf)$DRFi_days)
+min(na.omit(survivaldf)$DRFi_days)
+ggsurvplot(fit, data = survivaldf, pval=TRUE, pval.method=TRUE, linetype = 1, size=1.5, title="Overlapping downregulated genes \nin SCAN-B patients", subtitle="HR=0.77", break.x.by = 1000, ylab="Distant recurrence free survival probability",xlab = "Time (days)", conf.int = FALSE, legend.labs =c("High", "Low"), palette =c("#ca4781", "#E7B800"), risk.table = FALSE, tables.theme = theme_cleantable(), tables.y.text = FALSE, font.subtitle = c(10, "black"),font.x=10, font.y=10, font.main=c(12,"bold"),font.tickslab=c(10),censor.size=0, font.legend=c(10,"bold"), pval.size=4, pval.method.coord=c(50, 0.24), pval.method.size=4, legend = c(0.14, 0.45))
+
+#----selecting breast cancer free interval data
+library(survminer)
+library(survival)
+survcolumns <- merged
+survivv <- as.matrix(survcolumns)
+unique(survcolumns$BCFi_event)
+survivaldf <- as.data.frame(survivv)
+BCFi_DAYS <- survivaldf$BCFi_days
+BCFi_STATUS <- survivaldf$BCFi_event
+dayz <- as.numeric(BCFi_DAYS)
+status <- as.numeric(BCFi_STATUS)
+#plot by median cutoff
+survivaldf$median2=factor(survivaldf$median, levels=c('High','Low'))
+fit <- survfit(Surv(dayz, status) ~ median2, data = survivaldf)
+res.cox <- coxph(Surv(dayz, status) ~ median2, data = survivaldf)
+summary(res.cox, conf.int=FALSE)
+nrow(na.omit(survivaldf))
+max(na.omit(survivaldf)$BCFi_days)
+min(na.omit(survivaldf)$BCFi_days)
+ggsurvplot(fit, data = survivaldf, pval=TRUE, pval.method=TRUE, linetype = 1, size=1.5, title="Overlapping downregulated genes \nin SCAN-B patients", subtitle="HR=0.84", break.x.by = 1000, ylab="Breast cancer free interval probability",xlab = "Time (days)", conf.int = FALSE, legend.labs =c("High", "Low"), palette =c("#ca4781", "#E7B800"), risk.table = FALSE, tables.theme = theme_cleantable(), tables.y.text = FALSE, font.subtitle = c(10, "black"),font.x=10, font.y=10, font.main=c(12,"bold"),font.tickslab=c(10),censor.size=0, font.legend=c(10,"bold"), pval.size=4, pval.method.coord=c(50, 0.24), pval.method.size=4, legend = c(0.14, 0.45))
