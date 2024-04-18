@@ -32,17 +32,17 @@ up_mcf7tam$SYMBOL=geneIDs1$SYMBOL
 rownames(up_mcf7tam)=NULL
 
 down_mcf7exe=subset(dftop_MCF7EXE, rownames(dftop_MCF7EXE) %in% xALL_down)
-down_mcf7tam$line="MCF7TAM"
-ensembl.genes <- rownames(down_mcf7tam)
+down_mcf7exe$line="MCF7EXE"
+ensembl.genes <- rownames(down_mcf7exe)
 geneIDs1 <- ensembldb::select(EnsDb.Hsapiens.v79, keys= ensembl.genes, keytype = "GENEID", columns = c("SYMBOL","GENEID"))
-down_mcf7tam$SYMBOL=geneIDs1$SYMBOL
-rownames(down_mcf7tam)=NULL
-up_mcf7tam=subset(dftop_MCF7TAM, rownames(dftop_MCF7TAM) %in% xALL_up)
-up_mcf7tam$line="MCF7TAM"
-ensembl.genes <- rownames(up_mcf7tam)
+down_mcf7exe$SYMBOL=geneIDs1$SYMBOL
+rownames(down_mcf7exe)=NULL
+up_mcf7exe=subset(dftop_MCF7EXE, rownames(dftop_MCF7EXE) %in% xALL_up)
+up_mcf7exe$line="MCF7EXE"
+ensembl.genes <- rownames(up_mcf7exe)
 geneIDs1 <- ensembldb::select(EnsDb.Hsapiens.v79, keys= ensembl.genes, keytype = "GENEID", columns = c("SYMBOL","GENEID"))
-up_mcf7tam$SYMBOL=geneIDs1$SYMBOL
-rownames(up_mcf7tam)=NULL
+up_mcf7exe$SYMBOL=geneIDs1$SYMBOL
+rownames(up_mcf7exe)=NULL
 
 
 merged=rbind(down_t47d,down_t47dtam,up_t47d,up_t47dtam)
