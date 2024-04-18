@@ -45,7 +45,7 @@ up_mcf7exe$SYMBOL=geneIDs1$SYMBOL
 rownames(up_mcf7exe)=NULL
 
 
-merged=rbind(down_t47d,down_t47dtam,up_t47d,up_t47dtam)
+merged=rbind(down_mcf7, down_mcf7tam,down_mcf7exe,up_mcf7,up_mcf7tam,up_mcf7exe)
 merged$direction=ifelse(merged$log2FoldChange>0,"UP","DOWN")
 DOWN=subset(merged, merged$direction=="DOWN")
 UP=subset(merged,merged$direction=="UP")
